@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mi Biblioteca</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0f0f0f; --surface: #1a1a1a; --surface2: #242424; --surface3: #2e2e2e;
+      --border: #333; --text: #e8e8e8; --text-muted: #888; --text-faint: #555;
+      --accent: #8b7cf8; --accent-h: #7c6af5;
+      --danger: #ef4444; --danger-h: #dc2626;
+      --c-pend: #94a3b8; --c-leye: #f59e0b; --c-leid: #22c55e; --c-star: #f59e0b;
+    }
+    body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
+
+    /* HEADER */
+    header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 14px 24px; position: sticky; top: 0; z-index: 100; }
+    .header-inner { max-width: 1400px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    .logo { font-size: 20px; font-weight: 700; color: var(--accent); }
+    .stats { display: flex; gap: 24px; }
+    .stat { text-align: center; }
+    .stat-num { display: block; font-size: 22px; font-weight: 700; }
+    .stat-num.r { color: var(--c-leye); } .stat-num.g { color: var(--c-leid); } .stat-num.p { color: var(--accent); }
+    .stat-label { display: block; font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .05em; }
+
+    /* CONTROLS */
+    .controls { max-width: 1400px; margin: 20px auto; padding: 0 24px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+    .controls-l { display: flex; gap: 8px; flex: 1; min-width: 0; flex-wrap: wrap; }
+    .controls-r { display: flex; gap: 8px; }
+    input[type=search], select {
+      background: var(--surface); border: 1px solid var(--border); color: var(--text);
+      padding: 8px 12px; border-radius: 8px; font-size: 14px; outline: none; transition: border-color .15s;
+    }
+    input[type=search] { flex: 1; min-width: 180px; }
+    input[type=search]:focus, select:focus { border-color: var(--accent); }
+    select { cursor: pointer; }
+
+    /* BUTTONS */
+    .btn {
+      padding: 8px 14px; border-radius: 8px; border: none; font-size: 14px; font-weight: 500;
+      cursor: pointer; display: inline-flex; align-items: center; gap: 5px;
+      transition: background .15s; white-space: nowrap; text-decoration: none; line-height: 1.2;
+    }
+    .btn-primary { background: var(--accent); color: #fff; } .btn-primary:hover { background: var(--accent-h); }
+    .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); } .btn-secondary:hover { background: var(--surface3); }
+    .btn-danger { background: var(--danger); color: #fff; } .btn-danger:hover { background: var(--danger-h); }
+    .btn-ghost { background: transparent; color: var(--text-muted); border: 1px solid var(--border); } .btn-ghost:hover { background: var(--surface2); color: var(--text); }
+    .btn-sm { padding: 5px 10px; font-size: 12px; }
+
+    /* MAIN */
+    main { max-width: 1400px; margin: 0 auto; padding: 0 24px 60px; }
+    .books-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 18px; }
+
+    /* CARD */
+    .book-card {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+      overflow: hidden; display: flex; flex-direction: column;
+      transition: border-color .15s, transform .15s;
+    }
+    .book-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+    .book-cover { width: 100%; aspect-ratio: 2/3; background: var(--surface2); display: flex; align-items: center; justify-content: center; font-size: 48px; overflow: hidden; }
+    .book-cover img { width: 100%; height: 100%; object-fit: cover; }
+    .book-body { padding: 10px 12px; flex: 1; display: flex; flex-direction: column; gap: 5px; }
+    .book-title { font-weight: 600; font-size: 13px; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .book-author { font-size: 12px; color: var(--text-muted); }
+    .book-meta { display: flex; gap: 4px; flex-wrap: wrap; margin-top: auto; padding-top: 4px; }
+    .badge { display: inline-flex; align-items: center; padding: 2px 7px; border-radius: 100px; font-size: 11px; font-weight: 500; }
+    .b-pendiente { background: rgba(148,163,184,.15); color: var(--c-pend); }
+    .b-leyendo { background: rgba(245,158,11,.15); color: var(--c-leye); }
+    .b-leido { background: rgba(34,197,94,.15); color: var(--c-leid); }
+    .b-genre { background: rgba(139,124,248,.15); color: var(--accent); }
+    .b-prestado { background: rgba(239,68,68,.12); color: #f87171; font-size: 10px; }
+    .stars { display: flex; gap: 1px; }
+    .star { font-size: 12px; color: var(--text-faint); }
+    .star.on { color: var(--c-star); }
+    .card-actions { display: flex; gap: 6px; padding: 8px 10px; border-top: 1px solid var(--border); }
+    .card-actions .btn { flex: 1; justify-content: center; }
+
+    /* EMPTY */
+    .empty-state { text-align: center; padding: 80px 24px; color: var(--text-muted); }
+    .empty-icon { font-size: 60px; margin-bottom: 14px; }
+    .empty-state p { margin-bottom: 14px; }
+
+    /* MODALS */
+    .overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.72); z-index: 200; align-items: center; justify-content: center; padding: 16px; }
+    .overlay.on { display: flex; }
+    .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; width: 100%; max-width: 520px; max-height: 90vh; overflow-y: auto; }
+    .modal-sm { max-width: 380px; }
+    .mhead { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px 14px; border-bottom: 1px solid var(--border); }
+    .mtitle { font-size: 17px; font-weight: 600; }
+    .mclose { background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 18px; padding: 4px; line-height: 1; }
+    .mclose:hover { color: var(--text); }
+    .mbody { padding: 18px 22px; }
+    .mfoot { display: flex; gap: 8px; justify-content: flex-end; padding: 14px 22px; border-top: 1px solid var(--border); }
+
+    /* FORM */
+    .fg { margin-bottom: 14px; }
+    .flabel { display: block; font-size: 12px; font-weight: 500; color: var(--text-muted); margin-bottom: 5px; }
+    .freq { color: var(--accent); }
+    .fc {
+      width: 100%; background: var(--surface2); border: 1px solid var(--border); color: var(--text);
+      padding: 8px 11px; border-radius: 8px; font-size: 14px; font-family: inherit;
+      outline: none; transition: border-color .15s;
+    }
+    .fc:focus { border-color: var(--accent); }
+    .fc.err { border-color: var(--danger); }
+    textarea.fc { resize: vertical; min-height: 72px; }
+    .ferr { font-size: 12px; color: var(--danger); margin-top: 3px; }
+    .frow { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .divider { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
+
+    /* STAR INPUT */
+    .star-input { display: flex; gap: 4px; }
+    .sbtn { background: none; border: none; font-size: 22px; cursor: pointer; color: var(--text-faint); transition: color .1s, transform .1s; }
+    .sbtn:hover, .sbtn.on { color: var(--c-star); transform: scale(1.15); }
+
+    /* TOGGLE */
+    .toggle-wrap { display: flex; align-items: center; gap: 10px; }
+    .toggle { position: relative; width: 38px; height: 21px; }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .tslider { position: absolute; inset: 0; background: var(--surface3); border-radius: 21px; cursor: pointer; transition: background .2s; }
+    .tslider:before { content: ''; position: absolute; width: 15px; height: 15px; border-radius: 50%; background: #fff; top: 3px; left: 3px; transition: transform .2s; }
+    .toggle input:checked + .tslider { background: var(--accent); }
+    .toggle input:checked + .tslider:before { transform: translateX(17px); }
+
+    /* SEARCH RESULTS */
+    .sresults { display: flex; flex-direction: column; gap: 8px; max-height: 380px; overflow-y: auto; margin-top: 12px; }
+    .sitem { display: flex; gap: 11px; padding: 10px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; cursor: pointer; transition: border-color .15s; }
+    .sitem:hover { border-color: var(--accent); }
+    .scover { width: 38px; height: 56px; object-fit: cover; border-radius: 4px; background: var(--surface3); flex-shrink: 0; }
+    .sinfo-t { font-weight: 600; font-size: 13px; margin-bottom: 2px; }
+    .sinfo-a { font-size: 12px; color: var(--text-muted); }
+    .sinfo-y { font-size: 11px; color: var(--text-faint); margin-top: 2px; }
+
+    /* CAMERA */
+    #cam-video { width: 100%; border-radius: 8px; background: #000; max-height: 280px; }
+    .scan-status { text-align: center; margin-top: 10px; font-size: 13px; color: var(--text-muted); }
+
+    /* METHOD SELECT */
+    .methods { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .method { background: var(--surface2); border: 2px solid var(--border); border-radius: 12px; padding: 18px 14px; text-align: center; cursor: pointer; transition: border-color .15s; }
+    .method:hover { border-color: var(--accent); }
+    .method-icon { font-size: 30px; margin-bottom: 7px; }
+    .method-name { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
+    .method-desc { font-size: 12px; color: var(--text-muted); line-height: 1.4; }
+
+    .loading { text-align: center; padding: 20px; color: var(--text-muted); font-size: 14px; }
+
+    /* COVER PREVIEW */
+    #form-cover-wrap { display: none; margin-bottom: 14px; text-align: center; }
+    #form-cover-img { height: 110px; border-radius: 6px; object-fit: cover; }
+
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: var(--surface); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    @media (max-width: 600px) {
+      .controls { flex-direction: column; }
+      .controls-l, .controls-r { width: 100%; }
+      .frow { grid-template-columns: 1fr; }
+      .books-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+      .stats { gap: 14px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="logo">📚 Mi Biblioteca</div>
+    <div class="stats">
+      <div class="stat"><span class="stat-num" id="s-total">0</span><span class="stat-label">total</span></div>
+      <div class="stat"><span class="stat-num r" id="s-leye">0</span><span class="stat-label">leyendo</span></div>
+      <div class="stat"><span class="stat-num g" id="s-leid">0</span><span class="stat-label">leídos</span></div>
+      <div class="stat"><span class="stat-num p" id="s-pres">0</span><span class="stat-label">prestados</span></div>
+    </div>
+  </div>
+</header>
+
+<div class="controls">
+  <div class="controls-l">
+    <input type="search" id="q-input" placeholder="🔍 Buscar título o autor...">
+    <select id="f-estado">
+      <option value="">Todos los estados</option>
+      <option value="pendiente">Pendiente</option>
+      <option value="leyendo">Leyendo</option>
+      <option value="leido">Leído</option>
+    </select>
+    <select id="f-genero"><option value="">Todos los géneros</option></select>
+  </div>
+  <div class="controls-r">
+    <button class="btn btn-primary" id="btn-add">+ Agregar libro</button>
+    <button class="btn btn-secondary" id="btn-exp">↓ CSV</button>
+    <label class="btn btn-secondary" for="imp-file" style="cursor:pointer">↑ CSV</label>
+    <input type="file" id="imp-file" accept=".csv" style="display:none">
+  </div>
+</div>
+
+<main>
+  <div class="books-grid" id="grid"></div>
+  <div class="empty-state" id="empty" style="display:none">
+    <div class="empty-icon">📖</div>
+    <p>Tu biblioteca está vacía.</p>
+    <button class="btn btn-primary" onclick="openMethod()">Agregar el primer libro</button>
+  </div>
+</main>
+
+<!-- Modal: elegir método -->
+<div class="overlay" id="m-method">
+  <div class="modal modal-sm">
+    <div class="mhead"><div class="mtitle">Agregar libro</div><button class="mclose" onclick="closeM('m-method')">✕</button></div>
+    <div class="mbody">
+      <div class="methods">
+        <div class="method" onclick="openSearch()">
+          <div class="method-icon">🔍</div>
+          <div class="method-name">Buscar por título</div>
+          <div class="method-desc">Traigo info y portada de Open Library automáticamente</div>
+        </div>
+        <div class="method" onclick="openScan()">
+          <div class="method-icon">📷</div>
+          <div class="method-name">Escanear ISBN</div>
+          <div class="method-desc">Apuntá la cámara al código de barras del libro</div>
+        </div>
+      </div>
+      <hr class="divider">
+      <div style="text-align:center">
+        <button class="btn btn-ghost" onclick="closeM('m-method');openForm(null)">✏️ Cargar manualmente</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: buscar Open Library -->
+<div class="overlay" id="m-search">
+  <div class="modal" style="max-width:560px">
+    <div class="mhead"><div class="mtitle">Buscar libro</div><button class="mclose" onclick="closeM('m-search')">✕</button></div>
+    <div class="mbody">
+      <div style="display:flex;gap:8px">
+        <input type="text" class="fc" id="ol-q" placeholder="Título, autor, ISBN...">
+        <button class="btn btn-primary" id="ol-btn">Buscar</button>
+      </div>
+      <div id="ol-results"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: cámara/ISBN -->
+<div class="overlay" id="m-scan">
+  <div class="modal modal-sm">
+    <div class="mhead"><div class="mtitle">Escanear código de barras</div><button class="mclose" onclick="closeScan()">✕</button></div>
+    <div class="mbody">
+      <p style="font-size:13px;color:var(--text-muted);margin-bottom:10px">Apuntá la cámara al código de barras (ISBN) del libro.</p>
+      <video id="cam-video" autoplay playsinline muted></video>
+      <div class="scan-status" id="scan-status">Esperando código...</div>
+      <hr class="divider">
+      <p style="font-size:12px;color:var(--text-faint);text-align:center;margin-bottom:10px">— o ingresá el ISBN manualmente —</p>
+      <div style="display:flex;gap:8px">
+        <input type="text" class="fc" id="isbn-q" placeholder="ISBN (10 o 13 dígitos)">
+        <button class="btn btn-primary" id="isbn-btn">Buscar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: formulario libro -->
+<div class="overlay" id="m-form">
+  <div class="modal">
+    <div class="mhead">
+      <div class="mtitle" id="form-title">Nuevo libro</div>
+      <button class="mclose" onclick="closeM('m-form')">✕</button>
+    </div>
+    <div class="mbody">
+      <div id="form-cover-wrap"><img id="form-cover-img" src="" alt="Portada"></div>
+      <div class="frow">
+        <div class="fg">
+          <label class="flabel">Título <span class="freq">*</span></label>
+          <input type="text" class="fc" id="f-titulo" placeholder="Título del libro">
+          <div class="ferr" id="e-titulo"></div>
+        </div>
+        <div class="fg">
+          <label class="flabel">Autor</label>
+          <input type="text" class="fc" id="f-autor" placeholder="Autor/a">
+        </div>
+      </div>
+      <div class="frow">
+        <div class="fg">
+          <label class="flabel">Año</label>
+          <input type="number" class="fc" id="f-anio" placeholder="2024" min="1000" max="2100">
+        </div>
+        <div class="fg">
+          <label class="flabel">Género</label>
+          <input type="text" class="fc" id="f-genero" placeholder="Novela, ensayo..." list="dl-gen">
+          <datalist id="dl-gen"></datalist>
+        </div>
+      </div>
+      <div class="fg">
+        <label class="flabel">Estado</label>
+        <select class="fc" id="f-estado">
+          <option value="pendiente">Pendiente de leer</option>
+          <option value="leyendo">Leyendo</option>
+          <option value="leido">Leído</option>
+        </select>
+      </div>
+      <div class="frow" id="g-leido" style="display:none">
+        <div class="fg">
+          <label class="flabel">Fecha de lectura</label>
+          <input type="date" class="fc" id="f-fecha">
+        </div>
+        <div class="fg">
+          <label class="flabel">Puntuación</label>
+          <div class="star-input" id="star-input">
+            <button type="button" class="sbtn" data-v="1">★</button>
+            <button type="button" class="sbtn" data-v="2">★</button>
+            <button type="button" class="sbtn" data-v="3">★</button>
+            <button type="button" class="sbtn" data-v="4">★</button>
+            <button type="button" class="sbtn" data-v="5">★</button>
+          </div>
+          <input type="hidden" id="f-punt" value="0">
+        </div>
+      </div>
+      <div class="fg">
+        <label class="flabel">¿Es tuyo?</label>
+        <div class="toggle-wrap">
+          <label class="toggle"><input type="checkbox" id="f-propio" checked><span class="tslider"></span></label>
+          <span id="lbl-propio">Sí, es mío</span>
+        </div>
+      </div>
+      <div class="fg" id="g-prestado" style="display:none">
+        <label class="flabel">¿Quién te lo prestó?</label>
+        <input type="text" class="fc" id="f-prestador" placeholder="Nombre de quien te lo prestó">
+      </div>
+      <div class="fg">
+        <label class="flabel">Resumen / de qué trata</label>
+        <textarea class="fc" id="f-resumen" placeholder="Tu descripción o la del libro..." rows="3"></textarea>
+      </div>
+      <div class="fg">
+        <label class="flabel">Libros o autores que menciona</label>
+        <textarea class="fc" id="f-menciones" placeholder="Ej: cita a Borges, menciona 'Cien años de soledad'..." rows="2"></textarea>
+      </div>
+    </div>
+    <div class="mfoot">
+      <button class="btn btn-ghost" onclick="closeM('m-form')">Cancelar</button>
+      <button class="btn btn-primary" id="btn-save">Guardar libro</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: confirmar borrado -->
+<div class="overlay" id="m-del">
+  <div class="modal modal-sm">
+    <div class="mhead"><div class="mtitle">¿Borrar libro?</div><button class="mclose" onclick="closeM('m-del')">✕</button></div>
+    <div class="mbody">
+      <p style="color:var(--text-muted)">Esta acción no se puede deshacer. ¿Seguro que querés borrar <strong id="del-titulo"></strong>?</p>
+    </div>
+    <div class="mfoot">
+      <button class="btn btn-ghost" onclick="closeM('m-del')">Cancelar</button>
+      <button class="btn btn-danger" id="btn-del-ok">Sí, borrar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+let libros = [];
+let editId = null;
+let delId = null;
+let searchHits = [];
+let camStream = null;
+let camInterval = null;
+
+// ── Persistence ────────────────────────────────────────────────────────────
+function load() {
+  try { libros = JSON.parse(localStorage.getItem('biblioteca')) || []; }
+  catch { libros = []; }
+}
+function save() { localStorage.setItem('biblioteca', JSON.stringify(libros)); }
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function today() { return new Date().toISOString().slice(0,10); }
+function uuidv4() { return crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2); }
+
+// ── Modal helpers ──────────────────────────────────────────────────────────
+function openM(id) { document.getElementById(id).classList.add('on'); }
+function closeM(id) { document.getElementById(id).classList.remove('on'); }
+
+// ── Render ──────────────────────────────────────────────────────────────────
+function filtered() {
+  const q = document.getElementById('q-input').value.toLowerCase();
+  const est = document.getElementById('f-estado').value;
+  const gen = document.getElementById('f-genero').value;
+  return libros.filter(l =>
+    (!q || l.titulo.toLowerCase().includes(q) || (l.autor||'').toLowerCase().includes(q)) &&
+    (!est || l.estado === est) &&
+    (!gen || l.genero === gen)
+  );
+}
+
+function starsHtml(n) {
+  return '<div class="stars">' + [1,2,3,4,5].map(i => `<span class="star ${i<=n?'on':''}"">★</span>`).join('') + '</div>';
+}
+
+function estadoLabel(e) { return {pendiente:'Pendiente',leyendo:'Leyendo',leido:'Leído'}[e]||e; }
+
+function cardHtml(l) {
+  const cover = l.portadaUrl
+    ? `<img src="${esc(l.portadaUrl)}" alt="" loading="lazy" onerror="this.parentElement.innerHTML='📖'">`
+    : '📖';
+  return `
+  <div class="book-card">
+    <div class="book-cover">${cover}</div>
+    <div class="book-body">
+      <div class="book-title">${esc(l.titulo)}</div>
+      <div class="book-author">${esc(l.autor||'—')}</div>
+      <div class="book-meta">
+        <span class="badge b-${l.estado}">${estadoLabel(l.estado)}</span>
+        ${l.genero ? `<span class="badge b-genre">${esc(l.genero)}</span>` : ''}
+        ${!l.esPropio ? `<span class="badge b-prestado">prestado${l.prestadoPor?' · '+esc(l.prestadoPor):''}</span>` : ''}
+      </div>
+      ${l.puntuacion > 0 ? starsHtml(l.puntuacion) : ''}
+    </div>
+    <div class="card-actions">
+      <button class="btn btn-secondary btn-sm" onclick="startEdit('${l.id}')">✏️ Editar</button>
+      <button class="btn btn-ghost btn-sm" onclick="askDel('${l.id}')">🗑️</button>
+    </div>
+  </div>`;
+}
+
+function render() {
+  const fl = filtered();
+  const grid = document.getElementById('grid');
+  const empty = document.getElementById('empty');
+  if (libros.length === 0) {
+    grid.style.display = 'none'; empty.style.display = '';
+  } else {
+    grid.style.display = 'grid'; empty.style.display = 'none';
+    grid.innerHTML = fl.length ? fl.map(cardHtml).join('') : '<p style="color:var(--text-muted);padding:40px 0;grid-column:1/-1;text-align:center">No hay resultados para este filtro.</p>';
+  }
+  document.getElementById('s-total').textContent = libros.length;
+  document.getElementById('s-leye').textContent = libros.filter(l=>l.estado==='leyendo').length;
+  document.getElementById('s-leid').textContent = libros.filter(l=>l.estado==='leido').length;
+  document.getElementById('s-pres').textContent = libros.filter(l=>!l.esPropio).length;
+  updateGenreFilter();
+}
+
+function updateGenreFilter() {
+  const sel = document.getElementById('f-genero');
+  const cur = sel.value;
+  const genres = [...new Set(libros.map(l=>l.genero).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">Todos los géneros</option>' + genres.map(g=>`<option value="${esc(g)}"${g===cur?' selected':''}>${esc(g)}</option>`).join('');
+}
+
+function updateGenreDatalist() {
+  const dl = document.getElementById('dl-gen');
+  const genres = [...new Set(libros.map(l=>l.genero).filter(Boolean))].sort();
+  dl.innerHTML = genres.map(g=>`<option value="${esc(g)}">`).join('');
+}
+
+// ── Method modal ────────────────────────────────────────────────────────────
+function openMethod() { openM('m-method'); }
+
+// ── Open Library search ────────────────────────────────────────────────────
+function openSearch() {
+  closeM('m-method');
+  openM('m-search');
+  document.getElementById('ol-q').value = '';
+  document.getElementById('ol-results').innerHTML = '';
+  setTimeout(()=>document.getElementById('ol-q').focus(), 100);
+}
+
+async function doSearch() {
+  const q = document.getElementById('ol-q').value.trim();
+  if (!q) return;
+  const res = document.getElementById('ol-results');
+  res.innerHTML = '<div class="loading">Buscando...</div>';
+  try {
+    const r = await fetch(`https://www.googleapis.com/books/v1/volumes?q=${encodeURIComponent(q)}&maxResults=12&printType=all`);
+    const data = await r.json();
+    if (!data.items?.length) { res.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:14px">Sin resultados. Probá con otro título o autor.</p>'; return; }
+    searchHits = data.items.map(item => {
+      const v = item.volumeInfo;
+      const isbn = v.industryIdentifiers?.find(x=>x.type==='ISBN_13')?.identifier || v.industryIdentifiers?.[0]?.identifier || '';
+      const cover = (v.imageLinks?.thumbnail || '').replace('http://','https://');
+      const coverSmall = (v.imageLinks?.smallThumbnail || '').replace('http://','https://');
+      return {
+        titulo: v.title || '',
+        autor: v.authors?.[0] || '',
+        anio: v.publishedDate ? parseInt(v.publishedDate) : null,
+        portadaUrl: cover,
+        coverSmall,
+        isbn,
+        genero: v.categories?.[0] || '',
+        resumen: v.description || ''
+      };
+    });
+    res.innerHTML = '<div class="sresults">' + searchHits.map((h,i) => `
+      <div class="sitem" onclick="pickSearch(${i})">
+        ${h.coverSmall ? `<img class="scover" src="${esc(h.coverSmall)}" alt="" onerror="this.style.display='none'">` : '<div class="scover"></div>'}
+        <div>
+          <div class="sinfo-t">${esc(h.titulo)}</div>
+          <div class="sinfo-a">${esc(h.autor||'—')}</div>
+          <div class="sinfo-y">${h.anio||''}</div>
+        </div>
+      </div>`).join('') + '</div>';
+  } catch {
+    res.innerHTML = '<p style="color:var(--danger);text-align:center;padding:14px">Error de conexión. Verificá internet.</p>';
+  }
+}
+
+function pickSearch(i) {
+  closeM('m-search');
+  openForm(searchHits[i]);
+}
+
+// ── Camera / barcode scan ──────────────────────────────────────────────────
+function openScan() {
+  closeM('m-method');
+  openM('m-scan');
+  document.getElementById('isbn-q').value = '';
+  document.getElementById('scan-status').textContent = 'Iniciando cámara...';
+  startCam();
+}
+
+function closeScan() {
+  stopCam();
+  closeM('m-scan');
+}
+
+async function startCam() {
+  try {
+    camStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+    const vid = document.getElementById('cam-video');
+    vid.srcObject = camStream;
+    const statusEl = document.getElementById('scan-status');
+    if ('BarcodeDetector' in window) {
+      const det = new BarcodeDetector({ formats: ['ean_13','ean_8','code_128','upc_a'] });
+      statusEl.textContent = 'Apuntá al código de barras...';
+      camInterval = setInterval(async () => {
+        try {
+          const codes = await det.detect(vid);
+          if (codes.length) {
+            clearInterval(camInterval); camInterval = null;
+            statusEl.textContent = `ISBN detectado: ${codes[0].rawValue}`;
+            await fetchISBN(codes[0].rawValue);
+          }
+        } catch {}
+      }, 600);
+    } else {
+      statusEl.textContent = 'Escaneo automático no disponible en este navegador. Usá el campo manual.';
+    }
+  } catch {
+    document.getElementById('scan-status').textContent = 'No se pudo acceder a la cámara. Usá el campo manual.';
+  }
+}
+
+function stopCam() {
+  camStream?.getTracks().forEach(t=>t.stop()); camStream = null;
+  if (camInterval) { clearInterval(camInterval); camInterval = null; }
+}
+
+async function fetchISBN(isbn) {
+  document.getElementById('scan-status').textContent = `Buscando ISBN ${isbn}...`;
+  try {
+    const r = await fetch(`https://www.googleapis.com/books/v1/volumes?q=isbn:${encodeURIComponent(isbn)}&maxResults=1`);
+    const data = await r.json();
+    if (data.items?.length) {
+      const v = data.items[0].volumeInfo;
+      const cover = (v.imageLinks?.thumbnail || '').replace('http://','https://');
+      closeScan();
+      openForm({
+        titulo: v.title||'',
+        autor: v.authors?.[0]||'',
+        anio: v.publishedDate ? parseInt(v.publishedDate) : null,
+        portadaUrl: cover,
+        isbn,
+        genero: v.categories?.[0]||'',
+        resumen: v.description||''
+      });
+    } else {
+      document.getElementById('scan-status').textContent = `No encontré info para ISBN ${isbn}. Podés cargarlo manualmente.`;
+    }
+  } catch {
+    document.getElementById('scan-status').textContent = 'Error de conexión.';
+  }
+}
+
+// ── Form modal ─────────────────────────────────────────────────────────────
+function openForm(data) {
+  editId = null;
+  document.getElementById('form-title').textContent = 'Nuevo libro';
+  resetForm();
+  if (data) fillForm(data);
+  updateGenreDatalist();
+  openM('m-form');
+}
+
+function startEdit(id) {
+  const l = libros.find(x=>x.id===id);
+  if (!l) return;
+  editId = id;
+  document.getElementById('form-title').textContent = 'Editar libro';
+  resetForm();
+  fillForm(l);
+  updateGenreDatalist();
+  openM('m-form');
+}
+
+function resetForm() {
+  ['f-titulo','f-autor','f-genero','f-resumen','f-menciones','f-fecha','f-prestador'].forEach(id=>{
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('f-anio').value = '';
+  document.getElementById('f-estado').value = 'pendiente';
+  document.getElementById('f-propio').checked = true;
+  document.getElementById('f-punt').value = '0';
+  document.getElementById('e-titulo').textContent = '';
+  document.getElementById('f-titulo').classList.remove('err');
+  document.getElementById('form-cover-wrap').style.display = 'none';
+  document.getElementById('form-cover-img').src = '';
+  setStars(0);
+  toggleLeidoGroups();
+  togglePrestadoGroup();
+}
+
+function fillForm(d) {
+  if (d.titulo) document.getElementById('f-titulo').value = d.titulo;
+  if (d.autor) document.getElementById('f-autor').value = d.autor;
+  if (d.anio) document.getElementById('f-anio').value = d.anio;
+  if (d.genero) document.getElementById('f-genero').value = d.genero;
+  if (d.resumen) document.getElementById('f-resumen').value = d.resumen;
+  if (d.menciones) document.getElementById('f-menciones').value = d.menciones;
+  if (d.fechaLectura) document.getElementById('f-fecha').value = d.fechaLectura;
+  if (d.prestadoPor) document.getElementById('f-prestador').value = d.prestadoPor;
+  if (d.estado) document.getElementById('f-estado').value = d.estado;
+  if (d.esPropio !== undefined) document.getElementById('f-propio').checked = d.esPropio;
+  if (d.puntuacion) { setStars(d.puntuacion); }
+  if (d.portadaUrl) {
+    document.getElementById('form-cover-img').src = d.portadaUrl;
+    document.getElementById('form-cover-wrap').style.display = '';
+  }
+  toggleLeidoGroups();
+  togglePrestadoGroup();
+}
+
+function setStars(n) {
+  document.querySelectorAll('#star-input .sbtn').forEach(b => b.classList.toggle('on', parseInt(b.dataset.v) <= n));
+  document.getElementById('f-punt').value = n;
+}
+
+function toggleLeidoGroups() {
+  const show = document.getElementById('f-estado').value === 'leido';
+  document.getElementById('g-leido').style.display = show ? '' : 'none';
+}
+
+function togglePrestadoGroup() {
+  const propio = document.getElementById('f-propio').checked;
+  document.getElementById('g-prestado').style.display = propio ? 'none' : '';
+  document.getElementById('lbl-propio').textContent = propio ? 'Sí, es mío' : 'Es prestado';
+}
+
+function saveLibro() {
+  const titulo = document.getElementById('f-titulo').value.trim();
+  if (!titulo) {
+    document.getElementById('e-titulo').textContent = 'El título es obligatorio.';
+    document.getElementById('f-titulo').classList.add('err');
+    document.getElementById('f-titulo').focus();
+    return;
+  }
+  document.getElementById('e-titulo').textContent = '';
+  document.getElementById('f-titulo').classList.remove('err');
+
+  const portadaUrl = document.getElementById('form-cover-img').src &&
+    !document.getElementById('form-cover-img').src.includes(location.href)
+    ? document.getElementById('form-cover-img').src : '';
+
+  const libro = {
+    id: editId || uuidv4(),
+    titulo,
+    autor: document.getElementById('f-autor').value.trim(),
+    anio: parseInt(document.getElementById('f-anio').value) || null,
+    portadaUrl,
+    genero: document.getElementById('f-genero').value.trim(),
+    estado: document.getElementById('f-estado').value,
+    fechaLectura: document.getElementById('f-fecha').value,
+    puntuacion: parseInt(document.getElementById('f-punt').value) || 0,
+    esPropio: document.getElementById('f-propio').checked,
+    prestadoPor: document.getElementById('f-prestador').value.trim(),
+    resumen: document.getElementById('f-resumen').value.trim(),
+    menciones: document.getElementById('f-menciones').value.trim(),
+    fechaAgregado: editId ? (libros.find(l=>l.id===editId)?.fechaAgregado || today()) : today()
+  };
+
+  if (editId) {
+    const idx = libros.findIndex(l=>l.id===editId);
+    libros[idx] = libro;
+  } else {
+    libros.unshift(libro);
+  }
+  save(); closeM('m-form'); render();
+}
+
+// ── Delete ──────────────────────────────────────────────────────────────────
+function askDel(id) {
+  const l = libros.find(x=>x.id===id);
+  if (!l) return;
+  delId = id;
+  document.getElementById('del-titulo').textContent = `"${l.titulo}"`;
+  openM('m-del');
+}
+
+document.getElementById('btn-del-ok').addEventListener('click', () => {
+  libros = libros.filter(l=>l.id!==delId);
+  delId = null;
+  save(); closeM('m-del'); render();
+});
+
+// ── Export CSV ──────────────────────────────────────────────────────────────
+function exportCSV() {
+  if (!libros.length) { alert('No hay libros para exportar.'); return; }
+  const cols = ['id','titulo','autor','anio','genero','estado','fechaLectura','puntuacion','esPropio','prestadoPor','resumen','menciones','portadaUrl','fechaAgregado'];
+  const header = ['ID','Titulo','Autor','Año','Genero','Estado','Fecha lectura','Puntuacion','Es propio','Prestado por','Resumen','Menciones','Portada URL','Fecha agregado'];
+  function e(v) {
+    const s = String(v ?? '');
+    return s.includes(';') || s.includes('"') || s.includes('\n') ? '"' + s.replace(/"/g,'""') + '"' : s;
+  }
+  const rows = [header, ...libros.map(l => cols.map(c => e(c==='esPropio'?l[c]?'si':'no':l[c])))];
+  const csv = rows.map(r=>r.join(';')).join('\n');
+  const blob = new Blob(['﻿'+csv], {type:'text/csv;charset=utf-8;'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `biblioteca_${today()}.csv`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// ── Import CSV ──────────────────────────────────────────────────────────────
+function importCSV(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    const text = e.target.result.replace(/^﻿/,'');
+    const lines = text.split('\n').filter(l=>l.trim());
+    if (lines.length < 2) { alert('El CSV no tiene datos.'); return; }
+    const imported = [];
+    for (let i = 1; i < lines.length; i++) {
+      const c = parseCSV(lines[i]);
+      if (!c[1]) continue;
+      imported.push({
+        id: c[0] || uuidv4(), titulo: c[1], autor: c[2]||'',
+        anio: parseInt(c[3])||null, genero: c[4]||'', estado: c[5]||'pendiente',
+        fechaLectura: c[6]||'', puntuacion: parseInt(c[7])||0,
+        esPropio: c[8]!=='no', prestadoPor: c[9]||'',
+        resumen: c[10]||'', menciones: c[11]||'',
+        portadaUrl: c[12]||'', fechaAgregado: c[13]||today()
+      });
+    }
+    if (!imported.length) { alert('No se encontraron registros válidos.'); return; }
+    if (!confirm(`¿Importar ${imported.length} libros? Se van a combinar con los actuales.`)) return;
+    imported.forEach(imp => {
+      const idx = libros.findIndex(l=>l.id===imp.id);
+      if (idx >= 0) libros[idx] = imp; else libros.push(imp);
+    });
+    save(); render();
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+function parseCSV(line) {
+  const r = []; let cur = '', inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    if (line[i] === '"') { if (inQ && line[i+1]==='"') { cur+='"'; i++; } else inQ=!inQ; }
+    else if (line[i]===';'&&!inQ) { r.push(cur); cur=''; }
+    else cur+=line[i];
+  }
+  r.push(cur); return r;
+}
+
+// ── Event wiring ────────────────────────────────────────────────────────────
+document.getElementById('btn-add').addEventListener('click', openMethod);
+document.getElementById('btn-exp').addEventListener('click', exportCSV);
+document.getElementById('imp-file').addEventListener('change', e => { if (e.target.files[0]) { importCSV(e.target.files[0]); e.target.value=''; } });
+
+document.getElementById('q-input').addEventListener('input', render);
+document.getElementById('f-estado').addEventListener('change', render);
+document.getElementById('f-genero').addEventListener('change', render);
+
+document.getElementById('ol-btn').addEventListener('click', doSearch);
+document.getElementById('ol-q').addEventListener('keydown', e=>{ if(e.key==='Enter') doSearch(); });
+
+document.getElementById('isbn-btn').addEventListener('click', ()=>{ const v=document.getElementById('isbn-q').value.trim(); if(v) fetchISBN(v); });
+document.getElementById('isbn-q').addEventListener('keydown', e=>{ if(e.key==='Enter'){ const v=document.getElementById('isbn-q').value.trim(); if(v) fetchISBN(v); } });
+
+document.getElementById('f-estado').addEventListener('change', toggleLeidoGroups);
+document.getElementById('f-propio').addEventListener('change', togglePrestadoGroup);
+
+document.querySelectorAll('#star-input .sbtn').forEach(b => {
+  b.addEventListener('click', () => {
+    const v = parseInt(b.dataset.v);
+    const cur = parseInt(document.getElementById('f-punt').value);
+    setStars(v === cur ? 0 : v);
+  });
+});
+
+document.getElementById('btn-save').addEventListener('click', saveLibro);
+
+// Close overlay on click outside modal
+document.querySelectorAll('.overlay').forEach(ov => {
+  ov.addEventListener('click', e => {
+    if (e.target === ov) {
+      if (ov.id === 'm-scan') closeScan(); else closeM(ov.id);
+    }
+  });
+});
+
+// ── Init ────────────────────────────────────────────────────────────────────
+load(); render();
+</script>
+</body>
+</html>
