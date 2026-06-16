@@ -229,25 +229,22 @@
     <div class="mhead"><div class="mtitle">Agregar libro</div><button class="mclose" onclick="closeM('m-method')">✕</button></div>
     <div class="mbody">
       <div class="methods">
-        <div class="method" onclick="openSearch()">
-          <div class="method-icon">🔍</div>
-          <div class="method-name">Buscar por título</div>
-          <div class="method-desc">Traigo info y portada de Open Library automáticamente</div>
-        </div>
-        <div class="method" onclick="openScan()">
-          <div class="method-icon">📷</div>
-          <div class="method-name">Escanear ISBN</div>
-          <div class="method-desc">Apuntá la cámara al código de barras del libro</div>
-        </div>
         <div class="method" onclick="openPhoto()">
           <div class="method-icon">🖼️</div>
           <div class="method-name">Foto de portada</div>
-          <div class="method-desc">Sacás una foto y leemos el texto de la tapa, sin internet</div>
         </div>
-      </div>
-      <hr class="divider">
-      <div style="text-align:center">
-        <button class="btn btn-ghost" onclick="closeM('m-method');openForm(null)">✏️ Cargar manualmente</button>
+        <div class="method" onclick="openScan()">
+          <div class="method-icon">📷</div>
+          <div class="method-name">ISBN scan</div>
+        </div>
+        <div class="method" onclick="openSearch()">
+          <div class="method-icon">🔍</div>
+          <div class="method-name">Buscar título</div>
+        </div>
+        <div class="method" onclick="closeM('m-method');openForm(null)">
+          <div class="method-icon">✏️</div>
+          <div class="method-name">Carga manual</div>
+        </div>
       </div>
     </div>
   </div>
