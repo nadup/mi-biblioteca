@@ -368,7 +368,7 @@
       </div>
       <div class="fg">
         <label class="flabel">Estado</label>
-        <select class="fc" id="f-estado">
+        <select class="fc" id="form-estado">
           <option value="pendiente">Pendiente de leer</option>
           <option value="leyendo">Leyendo</option>
           <option value="leido">Leído</option>
@@ -807,7 +807,7 @@ function resetForm() {
     document.getElementById(id).value = '';
   });
   document.getElementById('f-anio').value = '';
-  document.getElementById('f-estado').value = 'pendiente';
+  document.getElementById('form-estado').value = 'pendiente';
   document.getElementById('f-propio').checked = true;
   document.getElementById('f-punt').value = '0';
   document.getElementById('e-titulo').textContent = '';
@@ -838,7 +838,7 @@ function fillForm(d) {
   if (d.menciones) document.getElementById('f-menciones').value = d.menciones;
   if (d.fechaLectura) document.getElementById('f-fecha').value = d.fechaLectura;
   if (d.prestadoPor) document.getElementById('f-prestador').value = d.prestadoPor;
-  if (d.estado) document.getElementById('f-estado').value = d.estado;
+  if (d.estado) document.getElementById('form-estado').value = d.estado;
   if (d.esPropio !== undefined) document.getElementById('f-propio').checked = d.esPropio;
   if (d.puntuacion) { setStars(d.puntuacion); }
   if (d.portadaUrl) {
@@ -855,7 +855,7 @@ function setStars(n) {
 }
 
 function toggleLeidoGroups() {
-  const show = document.getElementById('f-estado').value === 'leido';
+  const show = document.getElementById('form-estado').value === 'leido';
   document.getElementById('g-leido').style.display = show ? '' : 'none';
 }
 
@@ -890,7 +890,7 @@ function saveLibro() {
     estilo: [...formTags.estilo],
     genero: [...formTags.genero],
     ejesTematicos: [...formTags.ejes],
-    estado: document.getElementById('f-estado').value,
+    estado: document.getElementById('form-estado').value,
     fechaLectura: document.getElementById('f-fecha').value,
     puntuacion: parseInt(document.getElementById('f-punt').value) || 0,
     esPropio: document.getElementById('f-propio').checked,
@@ -1008,7 +1008,7 @@ document.getElementById('ol-q').addEventListener('keydown', e=>{ if(e.key==='Ent
 document.getElementById('isbn-btn').addEventListener('click', ()=>{ const v=document.getElementById('isbn-q').value.trim(); if(v) fetchISBN(v); });
 document.getElementById('isbn-q').addEventListener('keydown', e=>{ if(e.key==='Enter'){ const v=document.getElementById('isbn-q').value.trim(); if(v) fetchISBN(v); } });
 
-document.getElementById('f-estado').addEventListener('change', toggleLeidoGroups);
+document.getElementById('form-estado').addEventListener('change', toggleLeidoGroups);
 document.getElementById('f-propio').addEventListener('change', togglePrestadoGroup);
 
 document.querySelectorAll('#star-input .sbtn').forEach(b => {
