@@ -139,12 +139,19 @@
     .scan-status { text-align: center; margin-top: 10px; font-size: 13px; color: var(--text-muted); }
 
     /* METHOD SELECT */
-    .methods { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-    .method { background: var(--surface2); border: 2px solid var(--border); border-radius: 12px; padding: 18px 14px; text-align: center; cursor: pointer; transition: border-color .15s; }
+    .methods { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; }
+    .method { background: var(--surface2); border: 2px solid var(--border); border-radius: 12px; padding: 16px 10px; text-align: center; cursor: pointer; transition: border-color .15s; }
     .method:hover { border-color: var(--accent); }
-    .method-icon { font-size: 30px; margin-bottom: 7px; }
-    .method-name { font-weight: 600; font-size: 14px; margin-bottom: 4px; }
-    .method-desc { font-size: 12px; color: var(--text-muted); line-height: 1.4; }
+    .method-icon { font-size: 28px; margin-bottom: 6px; }
+    .method-name { font-weight: 600; font-size: 13px; margin-bottom: 4px; }
+    .method-desc { font-size: 11px; color: var(--text-muted); line-height: 1.35; }
+
+    /* OCR lines */
+    .ocr-line { display: flex; align-items: center; gap: 6px; background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; }
+    .ocr-line-text { flex: 1; font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ocr-line.is-titulo { border-color: var(--accent); }
+    .ocr-line.is-autor { border-color: var(--c-leid); }
+    .picked-box { display: flex; flex-direction: column; gap: 5px; font-size: 13px; margin: 10px 0 14px; padding: 10px; background: var(--surface2); border-radius: 8px; }
 
     .loading { text-align: center; padding: 20px; color: var(--text-muted); font-size: 14px; }
 
@@ -223,6 +230,11 @@
           <div class="method-name">Escanear ISBN</div>
           <div class="method-desc">Apuntá la cámara al código de barras del libro</div>
         </div>
+        <div class="method" onclick="openPhoto()">
+          <div class="method-icon">🖼️</div>
+          <div class="method-name">Foto de portada</div>
+          <div class="method-desc">Sacás una foto y leemos el texto de la tapa, sin internet</div>
+        </div>
       </div>
       <hr class="divider">
       <div style="text-align:center">
@@ -260,6 +272,37 @@
         <input type="text" class="fc" id="isbn-q" placeholder="ISBN (10 o 13 dígitos)">
         <button class="btn btn-primary" id="isbn-btn">Buscar</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: foto de portada + OCR -->
+<div class="overlay" id="m-photo">
+  <div class="modal modal-sm">
+    <div class="mhead"><div class="mtitle">Foto de portada</div><button class="mclose" onclick="closeM('m-photo')">✕</button></div>
+    <div class="mbody">
+      <div id="photo-step-1">
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px">Sacá o elegí una foto de la tapa del libro. Va a quedar como portada y vamos a tratar de leer el título y el autor.</p>
+        <input type="file" id="photo-input" accept="image/*" capture="environment" style="display:none">
+        <button class="btn btn-primary" id="btn-take-photo" style="width:100%;justify-content:center">📷 Tomar / elegir foto</button>
+      </div>
+      <div id="photo-step-2" style="display:none">
+        <img id="photo-preview" src="" alt="" style="width:100%;border-radius:8px;margin-bottom:10px;max-height:200px;object-fit:cover">
+        <div class="loading" id="photo-loading">Leyendo el texto de la imagen...</div>
+        <div id="photo-lines" style="display:none">
+          <p style="font-size:12px;color:var(--text-muted);margin-bottom:8px">Tocá una línea y asignala a Título o Autor:</p>
+          <div id="lines-list" style="display:flex;flex-direction:column;gap:6px;max-height:200px;overflow-y:auto"></div>
+          <div class="picked-box">
+            <div>📕 Título: <strong id="picked-titulo">—</strong></div>
+            <div>✍️ Autor: <strong id="picked-autor">—</strong></div>
+          </div>
+          <button class="btn btn-ghost btn-sm" onclick="retakePhoto()">↺ Repetir foto</button>
+        </div>
+      </div>
+    </div>
+    <div class="mfoot">
+      <button class="btn btn-ghost" onclick="closeM('m-photo')">Cancelar</button>
+      <button class="btn btn-primary" id="btn-photo-continue" style="display:none">Continuar</button>
     </div>
   </div>
 </div>
@@ -361,6 +404,7 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script>
 // ── State ──────────────────────────────────────────────────────────────────
 let libros = [];
@@ -369,6 +413,10 @@ let delId = null;
 let searchHits = [];
 let camStream = null;
 let camInterval = null;
+let photoLines = [];
+let pickedTitulo = '';
+let pickedAutor = '';
+let photoCoverDataUrl = '';
 
 // ── Persistence ────────────────────────────────────────────────────────────
 function load() {
@@ -587,6 +635,103 @@ async function fetchISBN(isbn) {
     document.getElementById('scan-status').textContent = 'Error de conexión.';
   }
 }
+
+// ── Foto de portada + OCR ───────────────────────────────────────────────────
+function openPhoto() {
+  closeM('m-method');
+  resetPhotoModal();
+  openM('m-photo');
+}
+
+function resetPhotoModal() {
+  document.getElementById('photo-step-1').style.display = '';
+  document.getElementById('photo-step-2').style.display = 'none';
+  document.getElementById('photo-lines').style.display = 'none';
+  document.getElementById('photo-loading').style.display = '';
+  document.getElementById('photo-loading').textContent = 'Leyendo el texto de la imagen...';
+  document.getElementById('btn-photo-continue').style.display = 'none';
+  document.getElementById('photo-input').value = '';
+  document.getElementById('picked-titulo').textContent = '—';
+  document.getElementById('picked-autor').textContent = '—';
+  photoLines = []; pickedTitulo = ''; pickedAutor = ''; photoCoverDataUrl = '';
+}
+
+function retakePhoto() { resetPhotoModal(); }
+
+function fileToDataUrl(file, maxW, quality) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, maxW / img.width);
+        const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = reject;
+      img.src = reader.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+document.getElementById('btn-take-photo').addEventListener('click', () => document.getElementById('photo-input').click());
+
+document.getElementById('photo-input').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  document.getElementById('photo-step-1').style.display = 'none';
+  document.getElementById('photo-step-2').style.display = '';
+
+  try {
+    const [ocrUrl, thumbUrl] = await Promise.all([
+      fileToDataUrl(file, 1000, 0.85),
+      fileToDataUrl(file, 320, 0.6)
+    ]);
+    photoCoverDataUrl = thumbUrl;
+    document.getElementById('photo-preview').src = thumbUrl;
+
+    const { data } = await Tesseract.recognize(ocrUrl, 'spa+eng');
+    photoLines = data.text.split('\n').map(l => l.trim()).filter(l => l.length > 1);
+  } catch {
+    photoLines = [];
+  }
+  renderPhotoLines();
+});
+
+function renderPhotoLines() {
+  document.getElementById('photo-loading').style.display = 'none';
+  document.getElementById('photo-lines').style.display = '';
+  const list = document.getElementById('lines-list');
+  if (!photoLines.length) {
+    list.innerHTML = '<p style="color:var(--text-muted);font-size:13px">No detecté texto legible. Continuá y completá título/autor a mano.</p>';
+  } else {
+    list.innerHTML = photoLines.map((line, i) => `
+      <div class="ocr-line" id="ocr-line-${i}">
+        <span class="ocr-line-text">${esc(line)}</span>
+        <button class="btn btn-secondary btn-sm" onclick="assignLine(${i},'titulo')">Título</button>
+        <button class="btn btn-secondary btn-sm" onclick="assignLine(${i},'autor')">Autor</button>
+      </div>`).join('');
+  }
+  document.getElementById('btn-photo-continue').style.display = '';
+}
+
+function assignLine(i, field) {
+  const text = photoLines[i];
+  document.querySelectorAll('.ocr-line').forEach(el => el.classList.remove(field==='titulo'?'is-titulo':'is-autor'));
+  document.getElementById(`ocr-line-${i}`).classList.add(field==='titulo'?'is-titulo':'is-autor');
+  if (field === 'titulo') { pickedTitulo = text; document.getElementById('picked-titulo').textContent = text; }
+  else { pickedAutor = text; document.getElementById('picked-autor').textContent = text; }
+}
+
+document.getElementById('btn-photo-continue').addEventListener('click', () => {
+  closeM('m-photo');
+  openForm({ titulo: pickedTitulo, autor: pickedAutor, portadaUrl: photoCoverDataUrl, genero: '', resumen: '' });
+});
 
 // ── Form modal ─────────────────────────────────────────────────────────────
 function openForm(data) {
