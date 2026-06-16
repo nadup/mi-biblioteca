@@ -296,15 +296,24 @@
         <img id="photo-preview" src="" alt="" style="width:100%;border-radius:8px;margin-bottom:10px;max-height:200px;object-fit:cover">
         <div class="loading" id="photo-loading">Leyendo el texto de la imagen...</div>
         <div id="photo-lines" style="display:none">
-          <p style="font-size:12px;color:var(--text-muted);margin-bottom:8px">Tocá una línea y asignala a Título, Autor o Editorial:</p>
-          <div id="lines-list" style="display:flex;flex-direction:column;gap:6px;max-height:200px;overflow-y:auto"></div>
-          <div class="picked-box">
-            <div>📕 Título: <strong id="picked-titulo">—</strong></div>
-            <div>✍️ Autor: <strong id="picked-autor">—</strong></div>
-            <div>🏷️ Editorial: <strong id="picked-editorial">—</strong></div>
-          </div>
-          <button class="btn btn-ghost btn-sm" onclick="retakePhoto()">↺ Repetir foto</button>
+          <p style="font-size:12px;color:var(--text-muted);margin-bottom:8px">Tocá una línea para completar un campo:</p>
+          <div id="lines-list" style="display:flex;flex-direction:column;gap:6px;max-height:160px;overflow-y:auto"></div>
         </div>
+        <div class="picked-box" id="picked-box" style="display:none">
+          <div class="fg" style="margin-bottom:8px">
+            <label class="flabel">📕 Título</label>
+            <input type="text" class="fc" id="picked-titulo-input" placeholder="Escribilo si el OCR no lo detectó bien">
+          </div>
+          <div class="fg" style="margin-bottom:8px">
+            <label class="flabel">✍️ Autor</label>
+            <input type="text" class="fc" id="picked-autor-input" placeholder="Autor/a">
+          </div>
+          <div class="fg" style="margin-bottom:0">
+            <label class="flabel">🏷️ Editorial</label>
+            <input type="text" class="fc" id="picked-editorial-input" placeholder="Editorial">
+          </div>
+        </div>
+        <button class="btn btn-ghost btn-sm" id="btn-retake-photo" style="display:none;margin-top:10px">↺ Repetir foto</button>
       </div>
     </div>
     <div class="mfoot">
@@ -433,9 +442,6 @@ let searchHits = [];
 let camStream = null;
 let camInterval = null;
 let photoLines = [];
-let pickedTitulo = '';
-let pickedAutor = '';
-let pickedEditorial = '';
 let photoCoverDataUrl = '';
 const formTags = { estilo: [], genero: [], ejes: [] };
 
@@ -679,12 +685,14 @@ function resetPhotoModal() {
   document.getElementById('photo-lines').style.display = 'none';
   document.getElementById('photo-loading').style.display = '';
   document.getElementById('photo-loading').textContent = 'Leyendo el texto de la imagen...';
+  document.getElementById('picked-box').style.display = 'none';
+  document.getElementById('btn-retake-photo').style.display = 'none';
   document.getElementById('btn-photo-continue').style.display = 'none';
   document.getElementById('photo-input').value = '';
-  document.getElementById('picked-titulo').textContent = '—';
-  document.getElementById('picked-autor').textContent = '—';
-  document.getElementById('picked-editorial').textContent = '—';
-  photoLines = []; pickedTitulo = ''; pickedAutor = ''; pickedEditorial = ''; photoCoverDataUrl = '';
+  document.getElementById('picked-titulo-input').value = '';
+  document.getElementById('picked-autor-input').value = '';
+  document.getElementById('picked-editorial-input').value = '';
+  photoLines = []; photoCoverDataUrl = '';
 }
 
 function retakePhoto() { resetPhotoModal(); }
@@ -712,11 +720,16 @@ function fileToDataUrl(file, maxW, quality) {
 
 document.getElementById('btn-take-photo').addEventListener('click', () => document.getElementById('photo-input').click());
 
+document.getElementById('btn-retake-photo').addEventListener('click', retakePhoto);
+
 document.getElementById('photo-input').addEventListener('change', async (e) => {
   const file = e.target.files[0];
   if (!file) return;
   document.getElementById('photo-step-1').style.display = 'none';
   document.getElementById('photo-step-2').style.display = '';
+  document.getElementById('picked-box').style.display = '';
+  document.getElementById('btn-retake-photo').style.display = '';
+  document.getElementById('btn-photo-continue').style.display = '';
 
   try {
     const [ocrUrl, thumbUrl] = await Promise.all([
@@ -736,11 +749,11 @@ document.getElementById('photo-input').addEventListener('change', async (e) => {
 
 function renderPhotoLines() {
   document.getElementById('photo-loading').style.display = 'none';
-  document.getElementById('photo-lines').style.display = '';
   const list = document.getElementById('lines-list');
   if (!photoLines.length) {
-    list.innerHTML = '<p style="color:var(--text-muted);font-size:13px">No detecté texto legible. Continuá y completá título/autor a mano.</p>';
+    document.getElementById('photo-lines').style.display = 'none';
   } else {
+    document.getElementById('photo-lines').style.display = '';
     list.innerHTML = photoLines.map((line, i) => `
       <div class="ocr-line" id="ocr-line-${i}">
         <span class="ocr-line-text">${esc(line)}</span>
@@ -749,22 +762,23 @@ function renderPhotoLines() {
         <button class="btn btn-secondary btn-sm" onclick="assignLine(${i},'editorial')">Editorial</button>
       </div>`).join('');
   }
-  document.getElementById('btn-photo-continue').style.display = '';
 }
 
 function assignLine(i, field) {
   const text = photoLines[i];
   const cls = { titulo: 'is-titulo', autor: 'is-autor', editorial: 'is-editorial' }[field];
+  const inputId = { titulo: 'picked-titulo-input', autor: 'picked-autor-input', editorial: 'picked-editorial-input' }[field];
   document.querySelectorAll('.ocr-line').forEach(el => el.classList.remove(cls));
   document.getElementById(`ocr-line-${i}`).classList.add(cls);
-  if (field === 'titulo') { pickedTitulo = text; document.getElementById('picked-titulo').textContent = text; }
-  else if (field === 'autor') { pickedAutor = text; document.getElementById('picked-autor').textContent = text; }
-  else { pickedEditorial = text; document.getElementById('picked-editorial').textContent = text; }
+  document.getElementById(inputId).value = text;
 }
 
 document.getElementById('btn-photo-continue').addEventListener('click', () => {
+  const titulo = document.getElementById('picked-titulo-input').value.trim();
+  const autor = document.getElementById('picked-autor-input').value.trim();
+  const editorial = document.getElementById('picked-editorial-input').value.trim();
   closeM('m-photo');
-  openForm({ titulo: pickedTitulo, autor: pickedAutor, editorial: pickedEditorial, portadaUrl: photoCoverDataUrl });
+  openForm({ titulo, autor, editorial, portadaUrl: photoCoverDataUrl });
 });
 
 // ── Form modal ─────────────────────────────────────────────────────────────
