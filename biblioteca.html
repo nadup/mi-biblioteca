@@ -155,6 +155,13 @@
     .book-editorial { font-size: 11px; color: var(--text-faint); }
     .picked-box { display: flex; flex-direction: column; gap: 5px; font-size: 13px; margin: 10px 0 14px; padding: 10px; background: var(--surface2); border-radius: 8px; }
 
+    /* CHIPS (multi-select) */
+    .chip-group { display: flex; flex-wrap: wrap; gap: 6px; }
+    .chip { background: var(--surface2); border: 1px solid var(--border); color: var(--text-muted); padding: 6px 12px; border-radius: 100px; font-size: 12px; cursor: pointer; transition: background .15s, border-color .15s, color .15s; }
+    .chip:hover { border-color: var(--accent); color: var(--text); }
+    .chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .book-tags-line { font-size: 11px; color: var(--text-faint); }
+
     .loading { text-align: center; padding: 20px; color: var(--text-muted); font-size: 14px; }
 
     /* COVER PREVIEW */
@@ -342,9 +349,16 @@
         </div>
       </div>
       <div class="fg">
+        <label class="flabel">Estilo</label>
+        <div class="chip-group" id="chips-estilo"></div>
+      </div>
+      <div class="fg">
         <label class="flabel">Género</label>
-        <input type="text" class="fc" id="f-genero" placeholder="Novela, ensayo..." list="dl-gen">
-        <datalist id="dl-gen"></datalist>
+        <div class="chip-group" id="chips-genero"></div>
+      </div>
+      <div class="fg">
+        <label class="flabel">Ejes temáticos</label>
+        <div class="chip-group" id="chips-ejes"></div>
       </div>
       <div class="fg">
         <label class="flabel">Estado</label>
@@ -426,6 +440,11 @@ let pickedTitulo = '';
 let pickedAutor = '';
 let pickedEditorial = '';
 let photoCoverDataUrl = '';
+const formTags = { estilo: [], genero: [], ejes: [] };
+
+const ESTILO_OPTS = ['Novela', 'Cuentos', 'Poesía', 'Novela gráfica/ilustrada'];
+const GENERO_OPTS = ['Realismo sucio / social', 'Realismo mágico', 'Gótico rioplatense / terror social', 'Grotesco / humor negro', 'Distopía', 'Policial / noir / thriller', 'Fantástico', 'Histórico', 'Autobiográfico'];
+const EJES_OPTS = ['Memoria', 'Identidad', 'Género', 'Familia / linaje', 'Migración / desplazamiento', 'Cuerpo / enfermedad', 'Poder / política', 'Amor / deseo', 'Duelo', 'Soledad / aislamiento', 'Crítica social / clase', 'Macabro', 'Violencia', 'Marginalidad'];
 
 // ── Persistence ────────────────────────────────────────────────────────────
 function load() {
@@ -453,7 +472,7 @@ function filtered() {
   return libros.filter(l =>
     (!q || l.titulo.toLowerCase().includes(q) || (l.autor||'').toLowerCase().includes(q)) &&
     (!est || l.estado === est) &&
-    (!gen || l.genero === gen)
+    (!gen || (l.genero||[]).includes(gen))
   );
 }
 
@@ -474,9 +493,10 @@ function cardHtml(l) {
       <div class="book-title">${esc(l.titulo)}</div>
       <div class="book-author">${esc(l.autor||'—')}</div>
       ${l.editorial ? `<div class="book-editorial">${esc(l.editorial)}</div>` : ''}
+      ${l.estilo?.length ? `<div class="book-tags-line">${esc(l.estilo.join(', '))}</div>` : ''}
       <div class="book-meta">
         <span class="badge b-${l.estado}">${estadoLabel(l.estado)}</span>
-        ${l.genero ? `<span class="badge b-genre">${esc(l.genero)}</span>` : ''}
+        ${(l.genero||[]).map(g=>`<span class="badge b-genre">${esc(g)}</span>`).join('')}
         ${!l.esPropio ? `<span class="badge b-prestado">prestado${l.prestadoPor?' · '+esc(l.prestadoPor):''}</span>` : ''}
       </div>
       ${l.puntuacion > 0 ? starsHtml(l.puntuacion) : ''}
@@ -508,17 +528,19 @@ function render() {
 function updateGenreFilter() {
   const sel = document.getElementById('f-genero');
   const cur = sel.value;
-  const genres = [...new Set(libros.map(l=>l.genero).filter(Boolean))].sort();
-  sel.innerHTML = '<option value="">Todos los géneros</option>' + genres.map(g=>`<option value="${esc(g)}"${g===cur?' selected':''}>${esc(g)}</option>`).join('');
+  sel.innerHTML = '<option value="">Todos los géneros</option>' + GENERO_OPTS.map(g=>`<option value="${esc(g)}"${g===cur?' selected':''}>${esc(g)}</option>`).join('');
 }
 
-function updateGenreDatalist() {
-  const dl = document.getElementById('dl-gen');
-  const genres = [...new Set(libros.map(l=>l.genero).filter(Boolean))].sort();
-  dl.innerHTML = genres.map(g=>`<option value="${esc(g)}">`).join('');
+function updateEditorialDatalist() {
   const dlEdit = document.getElementById('dl-edit');
   const editoriales = [...new Set(libros.map(l=>l.editorial).filter(Boolean))].sort();
   dlEdit.innerHTML = editoriales.map(g=>`<option value="${esc(g)}">`).join('');
+}
+
+function renderChips(containerId, options, selectedArr) {
+  document.getElementById(containerId).innerHTML = options.map(opt =>
+    `<button type="button" class="chip ${selectedArr.includes(opt)?'active':''}" data-v="${esc(opt)}">${esc(opt)}</button>`
+  ).join('');
 }
 
 // ── Method modal ────────────────────────────────────────────────────────────
@@ -554,7 +576,6 @@ async function doSearch() {
         portadaUrl: cover,
         coverSmall,
         isbn,
-        genero: v.categories?.[0] || '',
         resumen: v.description || ''
       };
     });
@@ -638,7 +659,6 @@ async function fetchISBN(isbn) {
         anio: v.publishedDate ? parseInt(v.publishedDate) : null,
         portadaUrl: cover,
         isbn,
-        genero: v.categories?.[0]||'',
         resumen: v.description||''
       });
     } else {
@@ -747,7 +767,7 @@ function assignLine(i, field) {
 
 document.getElementById('btn-photo-continue').addEventListener('click', () => {
   closeM('m-photo');
-  openForm({ titulo: pickedTitulo, autor: pickedAutor, editorial: pickedEditorial, portadaUrl: photoCoverDataUrl, genero: '', resumen: '' });
+  openForm({ titulo: pickedTitulo, autor: pickedAutor, editorial: pickedEditorial, portadaUrl: photoCoverDataUrl });
 });
 
 // ── Form modal ─────────────────────────────────────────────────────────────
@@ -756,7 +776,7 @@ function openForm(data) {
   document.getElementById('form-title').textContent = 'Nuevo libro';
   resetForm();
   if (data) fillForm(data);
-  updateGenreDatalist();
+  updateEditorialDatalist();
   openM('m-form');
 }
 
@@ -767,12 +787,12 @@ function startEdit(id) {
   document.getElementById('form-title').textContent = 'Editar libro';
   resetForm();
   fillForm(l);
-  updateGenreDatalist();
+  updateEditorialDatalist();
   openM('m-form');
 }
 
 function resetForm() {
-  ['f-titulo','f-autor','f-editorial','f-genero','f-resumen','f-menciones','f-fecha','f-prestador'].forEach(id=>{
+  ['f-titulo','f-autor','f-editorial','f-resumen','f-menciones','f-fecha','f-prestador'].forEach(id=>{
     document.getElementById(id).value = '';
   });
   document.getElementById('f-anio').value = '';
@@ -783,6 +803,10 @@ function resetForm() {
   document.getElementById('f-titulo').classList.remove('err');
   document.getElementById('form-cover-wrap').style.display = 'none';
   document.getElementById('form-cover-img').src = '';
+  formTags.estilo.length = 0; formTags.genero.length = 0; formTags.ejes.length = 0;
+  renderChips('chips-estilo', ESTILO_OPTS, formTags.estilo);
+  renderChips('chips-genero', GENERO_OPTS, formTags.genero);
+  renderChips('chips-ejes', EJES_OPTS, formTags.ejes);
   setStars(0);
   toggleLeidoGroups();
   togglePrestadoGroup();
@@ -793,7 +817,12 @@ function fillForm(d) {
   if (d.autor) document.getElementById('f-autor').value = d.autor;
   if (d.anio) document.getElementById('f-anio').value = d.anio;
   if (d.editorial) document.getElementById('f-editorial').value = d.editorial;
-  if (d.genero) document.getElementById('f-genero').value = d.genero;
+  formTags.estilo.length = 0; if (Array.isArray(d.estilo)) formTags.estilo.push(...d.estilo);
+  formTags.genero.length = 0; if (Array.isArray(d.genero)) formTags.genero.push(...d.genero);
+  formTags.ejes.length = 0; if (Array.isArray(d.ejesTematicos)) formTags.ejes.push(...d.ejesTematicos);
+  renderChips('chips-estilo', ESTILO_OPTS, formTags.estilo);
+  renderChips('chips-genero', GENERO_OPTS, formTags.genero);
+  renderChips('chips-ejes', EJES_OPTS, formTags.ejes);
   if (d.resumen) document.getElementById('f-resumen').value = d.resumen;
   if (d.menciones) document.getElementById('f-menciones').value = d.menciones;
   if (d.fechaLectura) document.getElementById('f-fecha').value = d.fechaLectura;
@@ -847,7 +876,9 @@ function saveLibro() {
     anio: parseInt(document.getElementById('f-anio').value) || null,
     editorial: document.getElementById('f-editorial').value.trim(),
     portadaUrl,
-    genero: document.getElementById('f-genero').value.trim(),
+    estilo: [...formTags.estilo],
+    genero: [...formTags.genero],
+    ejesTematicos: [...formTags.ejes],
     estado: document.getElementById('f-estado').value,
     fechaLectura: document.getElementById('f-fecha').value,
     puntuacion: parseInt(document.getElementById('f-punt').value) || 0,
@@ -885,13 +916,18 @@ document.getElementById('btn-del-ok').addEventListener('click', () => {
 // ── Export CSV ──────────────────────────────────────────────────────────────
 function exportCSV() {
   if (!libros.length) { alert('No hay libros para exportar.'); return; }
-  const cols = ['id','titulo','autor','anio','editorial','genero','estado','fechaLectura','puntuacion','esPropio','prestadoPor','resumen','menciones','portadaUrl','fechaAgregado'];
-  const header = ['ID','Titulo','Autor','Año','Editorial','Genero','Estado','Fecha lectura','Puntuacion','Es propio','Prestado por','Resumen','Menciones','Portada URL','Fecha agregado'];
+  const cols = ['id','titulo','autor','anio','editorial','estilo','genero','ejesTematicos','estado','fechaLectura','puntuacion','esPropio','prestadoPor','resumen','menciones','portadaUrl','fechaAgregado'];
+  const header = ['ID','Titulo','Autor','Año','Editorial','Estilo','Genero','Ejes tematicos','Estado','Fecha lectura','Puntuacion','Es propio','Prestado por','Resumen','Menciones','Portada URL','Fecha agregado'];
+  const arrayCols = ['estilo','genero','ejesTematicos'];
   function e(v) {
     const s = String(v ?? '');
     return s.includes(';') || s.includes('"') || s.includes('\n') ? '"' + s.replace(/"/g,'""') + '"' : s;
   }
-  const rows = [header, ...libros.map(l => cols.map(c => e(c==='esPropio'?l[c]?'si':'no':l[c])))];
+  const rows = [header, ...libros.map(l => cols.map(c => {
+    if (c === 'esPropio') return e(l[c] ? 'si' : 'no');
+    if (arrayCols.includes(c)) return e((l[c]||[]).join('|'));
+    return e(l[c]);
+  }))];
   const csv = rows.map(r=>r.join(';')).join('\n');
   const blob = new Blob(['﻿'+csv], {type:'text/csv;charset=utf-8;'});
   const a = document.createElement('a');
@@ -914,11 +950,15 @@ function importCSV(file) {
       if (!c[1]) continue;
       imported.push({
         id: c[0] || uuidv4(), titulo: c[1], autor: c[2]||'',
-        anio: parseInt(c[3])||null, editorial: c[4]||'', genero: c[5]||'', estado: c[6]||'pendiente',
-        fechaLectura: c[7]||'', puntuacion: parseInt(c[8])||0,
-        esPropio: c[9]!=='no', prestadoPor: c[10]||'',
-        resumen: c[11]||'', menciones: c[12]||'',
-        portadaUrl: c[13]||'', fechaAgregado: c[14]||today()
+        anio: parseInt(c[3])||null, editorial: c[4]||'',
+        estilo: (c[5]||'').split('|').filter(Boolean),
+        genero: (c[6]||'').split('|').filter(Boolean),
+        ejesTematicos: (c[7]||'').split('|').filter(Boolean),
+        estado: c[8]||'pendiente',
+        fechaLectura: c[9]||'', puntuacion: parseInt(c[10])||0,
+        esPropio: c[11]!=='no', prestadoPor: c[12]||'',
+        resumen: c[13]||'', menciones: c[14]||'',
+        portadaUrl: c[15]||'', fechaAgregado: c[16]||today()
       });
     }
     if (!imported.length) { alert('No se encontraron registros válidos.'); return; }
@@ -969,6 +1009,20 @@ document.querySelectorAll('#star-input .sbtn').forEach(b => {
 });
 
 document.getElementById('btn-save').addEventListener('click', saveLibro);
+
+function wireChipGroup(containerId, arr) {
+  document.getElementById(containerId).addEventListener('click', e => {
+    const btn = e.target.closest('.chip');
+    if (!btn) return;
+    const v = btn.dataset.v;
+    const idx = arr.indexOf(v);
+    if (idx >= 0) arr.splice(idx, 1); else arr.push(v);
+    btn.classList.toggle('active');
+  });
+}
+wireChipGroup('chips-estilo', formTags.estilo);
+wireChipGroup('chips-genero', formTags.genero);
+wireChipGroup('chips-ejes', formTags.ejes);
 
 // Close overlay on click outside modal
 document.querySelectorAll('.overlay').forEach(ov => {
