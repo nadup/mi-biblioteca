@@ -162,6 +162,16 @@
     .chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
     .book-tags-line { font-size: 11px; color: var(--text-faint); }
 
+    /* CROPPER */
+    .crop-stage { position: relative; width: 100%; line-height: 0; background: #000; border-radius: 8px; overflow: hidden; touch-action: none; }
+    .crop-stage img { display: block; width: 100%; height: auto; user-select: none; -webkit-user-drag: none; }
+    .crop-box { position: absolute; border: 2px dashed var(--accent); background: rgba(139,124,248,0.15); touch-action: none; }
+    .crop-handle { position: absolute; width: 24px; height: 24px; background: var(--accent); border: 2px solid #fff; border-radius: 50%; touch-action: none; }
+    .crop-handle[data-corner="tl"] { top: -12px; left: -12px; cursor: nwse-resize; }
+    .crop-handle[data-corner="tr"] { top: -12px; right: -12px; cursor: nesw-resize; }
+    .crop-handle[data-corner="bl"] { bottom: -12px; left: -12px; cursor: nesw-resize; }
+    .crop-handle[data-corner="br"] { bottom: -12px; right: -12px; cursor: nwse-resize; }
+
     .loading { text-align: center; padding: 20px; color: var(--text-muted); font-size: 14px; }
 
     /* COVER PREVIEW */
@@ -319,6 +329,32 @@
     <div class="mfoot">
       <button class="btn btn-ghost" onclick="closeM('m-photo')">Cancelar</button>
       <button class="btn btn-primary" id="btn-photo-continue" style="display:none">Continuar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: recortar foto antes de leer el texto -->
+<div class="overlay" id="m-crop">
+  <div class="modal modal-sm">
+    <div class="mhead"><div class="mtitle">Recortar foto</div><button class="mclose" id="crop-cancel-x">✕</button></div>
+    <div class="mbody">
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:10px">Arrastrá las esquinas para marcar la parte que querés que se lea.</p>
+      <div class="crop-stage" id="crop-stage">
+        <img id="crop-img" src="" alt="" draggable="false">
+        <div class="crop-box" id="crop-box">
+          <div class="crop-handle" data-corner="tl"></div>
+          <div class="crop-handle" data-corner="tr"></div>
+          <div class="crop-handle" data-corner="bl"></div>
+          <div class="crop-handle" data-corner="br"></div>
+        </div>
+      </div>
+    </div>
+    <div class="mfoot" style="justify-content:space-between">
+      <button class="btn btn-ghost btn-sm" id="crop-use-full">Usar foto completa</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-ghost" id="crop-cancel">Cancelar</button>
+        <button class="btn btn-primary" id="crop-confirm">Recortar</button>
+      </div>
     </div>
   </div>
 </div>
@@ -682,6 +718,98 @@ async function fetchISBN(isbn) {
   }
 }
 
+// ── Recortador de imagen (compartido por los 3 flujos de foto) ─────────────
+function openCropper(dataUrl) {
+  return new Promise(resolve => {
+    const img = document.getElementById('crop-img');
+    const stage = document.getElementById('crop-stage');
+    const box = document.getElementById('crop-box');
+    const cleanupFns = [];
+    let cropState = null, w = 0, h = 0, activeDrag = null;
+
+    function clamp(v, min, max) { return Math.max(min, Math.min(v, max)); }
+
+    function renderBox() {
+      box.style.left = cropState.left + 'px';
+      box.style.top = cropState.top + 'px';
+      box.style.width = (cropState.right - cropState.left) + 'px';
+      box.style.height = (cropState.bottom - cropState.top) + 'px';
+    }
+
+    function onPointerMove(e) {
+      if (!activeDrag) return;
+      e.preventDefault();
+      const dx = e.clientX - activeDrag.startX, dy = e.clientY - activeDrag.startY;
+      const s = activeDrag.startState, min = 30;
+      if (activeDrag.type === 'move') {
+        const bw = s.right - s.left, bh = s.bottom - s.top;
+        const nl = clamp(s.left + dx, 0, w - bw), nt = clamp(s.top + dy, 0, h - bh);
+        cropState.left = nl; cropState.top = nt; cropState.right = nl + bw; cropState.bottom = nt + bh;
+      } else {
+        const c = activeDrag.corner;
+        if (c.includes('l')) cropState.left = clamp(s.left + dx, 0, s.right - min);
+        if (c.includes('r')) cropState.right = clamp(s.right + dx, s.left + min, w);
+        if (c.includes('t')) cropState.top = clamp(s.top + dy, 0, s.bottom - min);
+        if (c.includes('b')) cropState.bottom = clamp(s.bottom + dy, s.top + min, h);
+      }
+      renderBox();
+    }
+    function onPointerUp() { activeDrag = null; }
+    function startDrag(e, type, corner) {
+      e.preventDefault();
+      activeDrag = { type, corner, startX: e.clientX, startY: e.clientY, startState: { ...cropState } };
+    }
+
+    document.addEventListener('pointermove', onPointerMove);
+    document.addEventListener('pointerup', onPointerUp);
+    cleanupFns.push(() => document.removeEventListener('pointermove', onPointerMove));
+    cleanupFns.push(() => document.removeEventListener('pointerup', onPointerUp));
+
+    const onBoxDown = e => { if (e.target.classList.contains('crop-handle')) return; startDrag(e, 'move'); };
+    box.addEventListener('pointerdown', onBoxDown);
+    cleanupFns.push(() => box.removeEventListener('pointerdown', onBoxDown));
+
+    document.querySelectorAll('#crop-box .crop-handle').forEach(handle => {
+      const fn = e => { e.stopPropagation(); startDrag(e, 'resize', handle.dataset.corner); };
+      handle.addEventListener('pointerdown', fn);
+      cleanupFns.push(() => handle.removeEventListener('pointerdown', fn));
+    });
+
+    function finish(result) {
+      cleanupFns.forEach(fn => fn());
+      closeM('m-crop');
+      resolve(result);
+    }
+
+    function onConfirm() {
+      const scaleX = img.naturalWidth / w, scaleY = img.naturalHeight / h;
+      const sx = cropState.left * scaleX, sy = cropState.top * scaleY;
+      const sw = (cropState.right - cropState.left) * scaleX, sh = (cropState.bottom - cropState.top) * scaleY;
+      const canvas = document.createElement('canvas');
+      canvas.width = sw; canvas.height = sh;
+      canvas.getContext('2d').drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+      finish(canvas.toDataURL('image/jpeg', 0.92));
+    }
+    const onUseFull = () => finish(dataUrl);
+    const onCancel = () => finish(null);
+
+    document.getElementById('crop-confirm').onclick = onConfirm;
+    document.getElementById('crop-use-full').onclick = onUseFull;
+    document.getElementById('crop-cancel').onclick = onCancel;
+    document.getElementById('crop-cancel-x').onclick = onCancel;
+
+    img.onload = () => {
+      requestAnimationFrame(() => {
+        w = img.clientWidth; h = img.clientHeight;
+        cropState = { left: w * 0.08, top: h * 0.15, right: w * 0.92, bottom: h * 0.85 };
+        renderBox();
+        openM('m-crop');
+      });
+    };
+    img.src = dataUrl;
+  });
+}
+
 // ── Foto de portada + OCR ───────────────────────────────────────────────────
 function openPhoto() {
   closeM('m-method');
@@ -735,6 +863,10 @@ document.getElementById('btn-retake-photo').addEventListener('click', retakePhot
 document.getElementById('photo-input').addEventListener('change', async (e) => {
   const file = e.target.files[0];
   if (!file) return;
+  const rawUrl = await fileToDataUrl(file, 1600, 0.9);
+  const croppedUrl = await openCropper(rawUrl);
+  if (!croppedUrl) { e.target.value = ''; return; }
+
   document.getElementById('photo-step-1').style.display = 'none';
   document.getElementById('photo-step-2').style.display = '';
   document.getElementById('picked-box').style.display = '';
@@ -742,14 +874,11 @@ document.getElementById('photo-input').addEventListener('change', async (e) => {
   document.getElementById('btn-photo-continue').style.display = '';
 
   try {
-    const [ocrUrl, thumbUrl] = await Promise.all([
-      fileToDataUrl(file, 1000, 0.85),
-      fileToDataUrl(file, 320, 0.6)
-    ]);
+    const thumbUrl = await fileToDataUrl(file, 320, 0.6);
     photoCoverDataUrl = thumbUrl;
     document.getElementById('photo-preview').src = thumbUrl;
 
-    const { data } = await Tesseract.recognize(ocrUrl, 'spa+eng');
+    const { data } = await Tesseract.recognize(croppedUrl, 'spa+eng');
     photoLines = data.text.split('\n').map(l => l.trim()).filter(l => l.length > 1);
   } catch {
     photoLines = [];
@@ -797,12 +926,14 @@ document.getElementById('btn-resumen-photo').addEventListener('click', () => doc
 document.getElementById('resumen-photo-input').addEventListener('change', async (e) => {
   const file = e.target.files[0];
   if (!file) return;
+  const rawUrl = await fileToDataUrl(file, 1600, 0.9);
+  const croppedUrl = await openCropper(rawUrl);
+  if (!croppedUrl) { e.target.value = ''; return; }
   const status = document.getElementById('resumen-ocr-status');
   status.style.display = '';
   status.textContent = 'Leyendo texto...';
   try {
-    const ocrUrl = await fileToDataUrl(file, 1200, 0.85);
-    const { data } = await Tesseract.recognize(ocrUrl, 'spa+eng');
+    const { data } = await Tesseract.recognize(croppedUrl, 'spa+eng');
     const text = data.text.split('\n').map(l => l.trim()).filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
     if (text) {
       const ta = document.getElementById('f-resumen');
@@ -829,12 +960,14 @@ document.getElementById('btn-mencion-photo').addEventListener('click', () => doc
 document.getElementById('mencion-photo-input').addEventListener('change', async (e) => {
   const file = e.target.files[0];
   if (!file) return;
+  const rawUrl = await fileToDataUrl(file, 1600, 0.9);
+  const croppedUrl = await openCropper(rawUrl);
+  if (!croppedUrl) { e.target.value = ''; return; }
   const status = document.getElementById('mencion-ocr-status');
   status.style.display = '';
   status.textContent = 'Leyendo texto...';
   try {
-    const ocrUrl = await fileToDataUrl(file, 1200, 0.85);
-    const { data } = await Tesseract.recognize(ocrUrl, 'spa+eng');
+    const { data } = await Tesseract.recognize(croppedUrl, 'spa+eng');
     const text = data.text.split('\n').map(l => l.trim()).filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
     if (text) {
       const ta = document.getElementById('f-menciones');
@@ -1114,7 +1247,9 @@ wireChipGroup('chips-ejes', formTags.ejes);
 document.querySelectorAll('.overlay').forEach(ov => {
   ov.addEventListener('click', e => {
     if (e.target === ov) {
-      if (ov.id === 'm-scan') closeScan(); else closeM(ov.id);
+      if (ov.id === 'm-scan') closeScan();
+      else if (ov.id === 'm-crop') document.getElementById('crop-cancel-x').click();
+      else closeM(ov.id);
     }
   });
 });
