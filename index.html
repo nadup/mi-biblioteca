@@ -404,6 +404,11 @@
       </div>
       <div class="fg">
         <label class="flabel">Resumen / de qué trata</label>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+          <input type="file" id="resumen-photo-input" accept="image/*" capture="environment" style="display:none">
+          <button type="button" class="btn btn-secondary btn-sm" id="btn-resumen-photo">📷 Foto de contratapa</button>
+          <span id="resumen-ocr-status" style="display:none;font-size:12px;color:var(--text-muted)">Leyendo texto...</span>
+        </div>
         <textarea class="fc" id="f-resumen" placeholder="Tu descripción o la del libro..." rows="3"></textarea>
       </div>
       <div class="fg">
@@ -779,6 +784,38 @@ document.getElementById('btn-photo-continue').addEventListener('click', () => {
   const editorial = document.getElementById('picked-editorial-input').value.trim();
   closeM('m-photo');
   openForm({ titulo, autor, editorial, portadaUrl: photoCoverDataUrl });
+});
+
+// ── Foto de contratapa → Resumen (OCR de párrafo) ──────────────────────────
+document.getElementById('btn-resumen-photo').addEventListener('click', () => document.getElementById('resumen-photo-input').click());
+
+document.getElementById('resumen-photo-input').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const status = document.getElementById('resumen-ocr-status');
+  status.style.display = '';
+  status.textContent = 'Leyendo texto...';
+  try {
+    const ocrUrl = await fileToDataUrl(file, 1200, 0.85);
+    const { data } = await Tesseract.recognize(ocrUrl, 'spa+eng');
+    const text = data.text.split('\n').map(l => l.trim()).filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+    if (text) {
+      const ta = document.getElementById('f-resumen');
+      ta.value = ta.value.trim() ? ta.value.trim() + '\n\n' + text : text;
+    } else {
+      status.textContent = 'No detecté texto legible en la foto.';
+      setTimeout(() => { status.style.display = 'none'; }, 2500);
+      e.target.value = '';
+      return;
+    }
+  } catch {
+    status.textContent = 'Error al leer la imagen. Probá de nuevo o escribilo a mano.';
+    setTimeout(() => { status.style.display = 'none'; }, 2500);
+    e.target.value = '';
+    return;
+  }
+  status.style.display = 'none';
+  e.target.value = '';
 });
 
 // ── Form modal ─────────────────────────────────────────────────────────────
